@@ -56,6 +56,7 @@ changes:
 try:
     import boto3
     import botocore
+
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
@@ -94,24 +95,19 @@ def main():
         key=dict(required=False, type='str')
     ))
 
-    module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True)
+    module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True,
+                           required_if=[["state", "present", ["item"]], ["state", "absent", ["key"]]],
+                           mutually_exclusive=[['item', 'key']])
 
     if not HAS_BOTO3:
         module.fail_json(msg='boto3 is required.')
-
-    # Check parameters
-    if module.params['state'] == 'present':
-        if 'item' not in module.params or module.params['item'] is None:
-            module.fail_json(msg="To put an item, it must be specified")
-    elif module.params['state'] == 'absent':
-        if 'key' not in module.params or module.params['key'] is None:
-            module.fail_json(msg="To delete an item, its key must be specified")
 
     # Apply module
     try:
         region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
         if not region:
-            module.fail_json(msg="Region must be specified as a parameter, in EC2_REGION or AWS_REGION environment variables or in boto configuration file")
+            module.fail_json(
+                msg="Region must be specified as a parameter, in EC2_REGION or AWS_REGION environment variables or in boto configuration file")
         conn = boto3_conn(module, conn_type='client', resource='dynamodb',
                           region=region, endpoint=ec2_url, **aws_connect_kwargs)
     except boto.exception.NoAuthHandlerFound as e:
